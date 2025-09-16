@@ -31,8 +31,10 @@ check_rate_limit() {
 }
 
 # Perform a GitHub API GET request with retry/backoff on rate-limited responses
+# Change gh_api_get to optionally write headers to a file passed as $2
 gh_api_get() {
   local url="$1"
+  local out_headers_file="${2:-}"
   local attempt=0 max_attempts=5 backoff=60
   local headers body status
 
@@ -48,6 +50,7 @@ gh_api_get() {
 
     if [[ "$status" == "200" ]]; then
       check_rate_limit "$headers"
+      [[ -n "$out_headers_file" ]] && cp "$headers" "$out_headers_file"
       rm -f "$headers"
       printf "%s" "$body"
       return 0
@@ -73,28 +76,31 @@ gh_api_get() {
 ######################################
 
 # Fetch all repo names (with gh_api_get), handling pagination
+# In fetch_all_repos, capture and read the Link header
 fetch_all_repos() {
   local org="$1"
-  local page=1 per_page=100 link url tmp_body
+  local page=1 per_page=100 link url tmp_body tmp_headers
 
-  REPOS=()  # initialize
+  REPOS=()
 
   while :; do
     echo -e "${CYAN}→ Fetching page $page of repositories for org $org${NC}..."
 
-    url="https://api.github.com/orgs/$org/repos?per_page=$per_page&page=$page"
+    url="https://api.github.com/orgs/$org/repos?type=all&per_page=$per_page&page=$page"
     tmp_body=$(mktemp)
-    # Use gh_api_get to fetch with rate limit logic
-    gh_api_get "$url" > "$tmp_body"
+    tmp_headers=$(mktemp)
 
-    # Collect repo names
+    gh_api_get "$url" "$tmp_headers" > "$tmp_body"
+
+    # collect repo names
     while IFS= read -r repo; do
       [ -n "$repo" ] && REPOS+=( "$repo" )
     done < <(jq -r '.[].name' "$tmp_body")
 
-    # Check if there is a next page
-    link=$(grep -Fi 'link:' "$tmp_body" || true)
-    rm -f "$tmp_body"
+    # read Link header (headers, not body!)
+    link=$(grep -i '^Link:' "$tmp_headers" || true)
+
+    rm -f "$tmp_body" "$tmp_headers"
 
     [[ "$link" =~ rel=\"next\" ]] || break
     (( page++ ))
