@@ -188,10 +188,27 @@ main() {
     exit 1
   fi
 
-  KEYWORDS=()
-  while IFS= read -r kw || [ -n "$kw" ]; do
-    KEYWORDS+=( "$kw" )
+  # Parse keywords file where each line is like:
+  # pkg@ver1,ver2,ver3
+  KEYWORDS_RAW=()
+  while IFS= read -r line || [ -n "$line" ]; do
+    # Trim leading/trailing whitespace
+    trimmed="$(printf '%s' "$line" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
+    [ -n "$trimmed" ] && KEYWORDS_RAW+=( "$trimmed" )
   done < "$KEYWORDS_FILE"
+
+  KEYWORDS=()
+  for raw in "${KEYWORDS_RAW[@]}"; do
+    # Extract the versions part (after the *last* "@")
+    versions_part="${raw##*@}"
+    pkg_name="${raw%@$versions_part}"
+    # Split the comma-separated versions
+    IFS=',' read -r -a version_array <<< "$versions_part"
+    for ver in "${version_array[@]}"; do
+      ver_trim="$(printf '%s' "$ver" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
+      [ -n "$ver_trim" ] && KEYWORDS+=( "${pkg_name}@${ver_trim}" )
+    done
+  done
 
   mkdir -p "./${ORG}_repos"
   cd "./${ORG}_repos" || exit 1
