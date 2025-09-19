@@ -20,6 +20,10 @@ error-ex@1.3.3
 @coveops/abi@2.0.1
 proto-tinker-wc@0.1.87
 duckdb@1.3.3
+duck-db-wasm@1.29.2
+duck-db node-api@1.3.3
+duck-db node-bindings@1.3.3
+Prebid.js@10.9.1,10.9.2
 @duckdb/node-api@1.3.3
 @duckdb/duckdb-wasm@1.29.2
 @ahmedhfarag/ngx-perfect-scrollbar@20.0.20
